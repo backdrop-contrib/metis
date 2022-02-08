@@ -1,11 +1,11 @@
+type = module
 name = Metis
 description = Includes the Metis pixel for VG Wort counts.
 package = Fields
+backdrop = 1.x
+
 dependencies[] = field
 dependencies[] = text
 dependencies[] = options
-core = 7.x
 
-files[] = metis.install
-files[] = metis.module
-files[] = metis.views_default.inc
+configure = admin/config/search/metis

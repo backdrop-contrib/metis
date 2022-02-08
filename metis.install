@@ -11,8 +11,9 @@
 function metis_install() {
 
   $t = get_t();
-  drupal_set_message($t('Metis settings are available under <a href="@link">Configuration > Search and Metadata > Metis</a>.', array('@link' => '/admin/config/search/metis')));
+  backdrop_set_message($t('Metis settings are available under <a href="@link">Configuration > Search and Metadata > Metis</a>.', array('@link' => '/admin/config/search/metis')));
 
+  // Dynamically generated variable data was detected on the following lines.
 }
 
 /**
@@ -21,8 +22,8 @@ function metis_install() {
 function metis_uninstall() {
 
   // Delete our module's variables from the variables table.
-  variable_del('metis_default_server');
-  variable_del('metis_force_ssl');
+  config_clear('metis.settings', 'metis_default_server');
+  config_clear('metis.settings', 'metis_force_ssl');
 
 }
 
@@ -105,7 +106,7 @@ function metis_requirements($phase) {
  */
 function metis_field_schema($field) {
   switch ($field['type']) {
-    case 'metis' :
+    case 'metis':
       $columns = array(
         'code_public' => array(
           'type' => 'varchar',
@@ -141,4 +142,17 @@ function metis_field_schema($field) {
   return array(
     'columns' => $columns,
   );
+}
+
+/**
+ * Migrate metis variables to config.
+ */
+function metis_update_1000() {
+  $config = config('metis.settings');
+  $config->set('metis_default_server', update_variable_get('metis_default_server', 'NULL'));
+  $config->set('metis_force_ssl', update_variable_get('metis_force_ssl', ''));
+  $config->save();
+
+  update_variable_del('metis_default_server');
+  update_variable_del('metis_force_ssl');
 }

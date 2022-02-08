@@ -37,7 +37,7 @@ function metis_menu() {
   $items['admin/config/search/metis'] = array(
     'title' => 'Metis',
     'description' => 'Metis settings',
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('metis_settings_form'),
     'access arguments' => array('administer metis module'),
     'type' => MENU_NORMAL_ITEM,
@@ -54,7 +54,7 @@ function metis_menu() {
   $items['admin/config/search/metis/codes'] = array(
     'title' => 'Import Metis codes',
     'description' => 'Import <abbr title="Comma Separated Values">CSV</abbr> file with metis codes',
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('metis_codes_csv_form'),
     'access arguments' => array('add site-wide metis codes'),
     'type' => MENU_LOCAL_TASK,
@@ -71,7 +71,7 @@ function metis_menu() {
   $items['admin/config/search/metis/codes/paste'] = array(
     'title' => 'Paste Metis codes',
     'description' => 'Add metis codes by pasting them to a form',
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('metis_codes_form'),
     'access arguments' => array('add site-wide metis codes'),
     'type' => MENU_LOCAL_TASK,
@@ -152,9 +152,21 @@ function metis_help($path, $arg) {
 
 
 /**
+ * Implements hook_config_info().
+ */
+function metis_config_info() {
+  $prefixes['metis.settings'] = array(
+    'label' => t('Metis settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
+
+/**
  * Define the settings form.
  */
 function metis_settings_form($form, &$form_state) {
+  $config = config('metis.settings');
 
   // Get metis field name(s).
   $fields = field_info_fields();
@@ -168,20 +180,21 @@ function metis_settings_form($form, &$form_state) {
 
   // Display warning if no Metis field is configured.
   if ($metis_fields == 0) {
-    drupal_set_message(t('There is no Metis field configured. Please add a field of the type <em>Metis</em> to at least one content type to make this module work.'), 'error');
+    backdrop_set_message(t('There is no Metis field configured. Please add a field of the type <em>Metis</em> to at least one content type to make this module work.'), 'error');
   }
 
   // Display warning if no unused codes left.
   if (metis_count_unused() == 0) {
-    drupal_set_message(t('There are no unused codes left. Please add some.'), 'error');
+    backdrop_set_message(t('There are no unused codes left. Please add some.'), 'error');
   }
 
   // Define a select list.
+  $form['#config'] = 'metis.settings';
   $form['metis_default_server'] = array(
     '#type' => 'select',
     '#title' => t('Default Metis server'),
     '#description' => t('Please select the default Metis server to be used when uploading codes. If your website is registered with VG Wort as an editorial, you will be assigned a server that you should use permanently.'),
-    '#default_value' => variable_get('metis_default_server', NULL),
+    '#default_value' => $config->get('metis_default_server'),
     '#options' => array(
       NULL => t('Please select'),
       'vg01.met.vgwort.de' => 'vg01.met.vgwort.de',
@@ -202,7 +215,7 @@ function metis_settings_form($form, &$form_state) {
     '#type' => 'checkbox',
     '#title' => t('Use SSL to include Metis codes'),
     '#description' => t('Activate this option if you wish to use a secure connection (SSL) to include Metis codes. In that case the server ssl-vg03.met.vgwort.de will be used.'),
-    '#default_value' => variable_get('metis_force_ssl', NULL),
+    '#default_value' => $config->get('metis_force_ssl'),
   );
 
   $form['status'] = array(
@@ -236,7 +249,7 @@ function metis_codes_form($form, &$form_state) {
     '#type' => 'select',
     '#title' => t('Metis Server'),
     '#description' => t('Please select a Metis server to be associated with the imported codes.'),
-    '#default_value' => variable_get('metis_default_server', NULL),
+    '#default_value' => config_get('metis.settings', 'metis_default_server'),
     '#options' => array(
       NULL => t('Please select'),
       'vg01.met.vgwort.de' => 'vg01.met.vgwort.de',
@@ -323,7 +336,7 @@ function metis_codes_csv_form($form, &$form_state) {
     '#type' => 'select',
     '#title' => t('Metis Server'),
     '#description' => t('Please select a Metis server to be associated with the imported codes.'),
-    '#default_value' => variable_get('metis_default_server', NULL),
+    '#default_value' => config_get('metis.settings', 'metis_default_server'),
     '#options' => array(
       NULL => t('Please select'),
       'vg01.met.vgwort.de' => 'vg01.met.vgwort.de',
@@ -363,14 +376,14 @@ function metis_codes_csv_form_validate($form, &$form_state) {
   // Attempt to save the uploaded file.
   $file = file_save_upload('file_csv', array(
     'file_validate_extensions' => array('csv'),
-    )
+  )
   );
 
   if ($file) {
 
     // Parse CSV file.
     ini_set('auto_detect_line_endings', TRUE);
-    $handle = fopen(drupal_realpath($file->uri), "r");
+    $handle = fopen(backdrop_realpath($file->uri), "r");
 
     while ($row = fgetcsv($handle, 0, ';')) {
 
@@ -458,11 +471,11 @@ function metis_code_validation($codes) {
           $codes_validated['code_exists'][] = $code;
         }
         // Error if public metis code is too long.
-        elseif (drupal_strlen($code['public']) != 32) {
+        elseif (backdrop_strlen($code['public']) != 32) {
           $codes_validated['public_length'][] = $code;
         }
         // Error if private metis code is too long.
-        elseif ($code['private'] && drupal_strlen($code['private']) != 32) {
+        elseif ($code['private'] && backdrop_strlen($code['private']) != 32) {
           $codes_validated['private_length'][] = $code;
         }
         // Error if server doesn't match.
@@ -506,7 +519,9 @@ function metis_code_submission($codes_validated) {
   $desired_keys = array('valid', 'ignored', 'public_length', 'private_length', 'server', 'code_exists', 'error_validaton');
 
   foreach ($desired_keys as $desired_key) {
-    if (in_array($desired_key, $keys)) continue;  // Already set.
+    if (in_array($desired_key, $keys)) {
+      continue; // Already set.
+    }
     $codes_validated[$desired_key] = NULL;
   }
 
@@ -540,28 +555,28 @@ function metis_code_submission($codes_validated) {
 
   // Set confirmation message.
   if ($count_submit > 0) {
-    drupal_set_message(t('%count codes have been saved.', array('%count' => $count_submit)));
+    backdrop_set_message(t('%count codes have been saved.', array('%count' => $count_submit)));
   }
   if ($count_ignored > 0) {
-    drupal_set_message(t('%count line(s) have been ignored.', array('%count' => $count_ignored)), 'warning');
+    backdrop_set_message(t('%count line(s) have been ignored.', array('%count' => $count_ignored)), 'warning');
   }
   if ($count_public_length > 0) {
-    drupal_set_message(t('%count codes have not been saved because the public metis code is not 32 letters long.', array('%count' => $count_public_length)), 'warning');
+    backdrop_set_message(t('%count codes have not been saved because the public metis code is not 32 letters long.', array('%count' => $count_public_length)), 'warning');
   }
   if ($count_private_length > 0) {
-    drupal_set_message(t('%count codes have not been saved because the private metis code is not 32 letters long.', array('%count' => $count_private_length)), 'warning');
+    backdrop_set_message(t('%count codes have not been saved because the private metis code is not 32 letters long.', array('%count' => $count_private_length)), 'warning');
   }
   if ($count_server > 0) {
-    drupal_set_message(t("%count codes have not been saved because the server wasn't valid.", array('%count' => $count_server)), 'warning');
+    backdrop_set_message(t("%count codes have not been saved because the server wasn't valid.", array('%count' => $count_server)), 'warning');
   }
   if ($count_code_exists > 0) {
-    drupal_set_message(t('%count codes have not been saved because they already existed.', array('%count' => $count_code_exists)), 'warning');
+    backdrop_set_message(t('%count codes have not been saved because they already existed.', array('%count' => $count_code_exists)), 'warning');
   }
   if ($count_error_validation > 0) {
-    drupal_set_message(t('There have been %count validation errors.', array('%count' => $count_error_validation)), 'error');
+    backdrop_set_message(t('There have been %count validation errors.', array('%count' => $count_error_validation)), 'error');
   }
   if ($count_error > 0) {
-    drupal_set_message(t('%count codes have not been saved because of an error.', array('%count' => $count_error)), 'error');
+    backdrop_set_message(t('%count codes have not been saved because of an error.', array('%count' => $count_error)), 'error');
   }
 
 }
@@ -629,14 +644,14 @@ function metis_get_unused() {
 function metis_set_used($code_public, $nid) {
 
   // Check if code has 32 characters and nid is present.
-  if (drupal_strlen($code_public) == 32 && is_numeric($nid)) {
+  if (backdrop_strlen($code_public) == 32 && is_numeric($nid)) {
 
     // Update database and set used codes as used.
     try {
       db_update('metis')
         ->fields(array(
-          'used' => $nid,
-        ))
+        'used' => $nid,
+      ))
         ->condition('code_public', $code_public)
         ->condition('used', 0)
         ->execute();
@@ -683,7 +698,7 @@ function metis_field_info() {
       'description' => t('VG Wort metis code'),
       'default_widget' => 'code_widget',
       'default_formatter' => 'metis_default',
-      ),
+    ),
   );
 
 }
@@ -819,10 +834,10 @@ function metis_code_widget_process($element, &$form_state) {
   }
   // TODO: Fieldset (http://stackoverflow.com/q/5705983)
   // $element['metis'] = array(
-  //   '#title' => $element['#title'] . ' (VG Wort)',
-  //   '#type' => 'fieldset',
-  //   '#collapsible' => TRUE,
-  //   '#collapsed' => FALSE,
+//   '#title' => $element['#title'] . ' (VG Wort)',
+//   '#type' => 'fieldset',
+//   '#collapsible' => TRUE,
+//   '#collapsed' => FALSE,
   // );
 
   $element['code_public'] = array(
@@ -950,7 +965,7 @@ function metis_field_attach_view_alter(&$output, $context) {
   // Hide field label for default formatter.
   foreach ($output as $field_name => $field) {
     if (!empty($field['#label_display'])) {
-      if(isset($field['#formatter']) && $field['#formatter'] == 'metis_default') {
+      if (isset($field['#formatter']) && $field['#formatter'] == 'metis_default') {
         $output[$field_name]['#label_display'] = 'hidden';
       }
     }
@@ -975,7 +990,7 @@ function theme_metis_default($variables) {
   // code exists, (c) a server exists, (d) on node pages (node/*).
   if ($element['#show'] == 1 && !empty($element['#code_public']) && !empty($element['#server']) && arg(0) == 'node' && is_numeric(arg(1))) {
     // Use SSL server if option to use SSL is set.
-    if (variable_get('metis_force_ssl') == 1) {
+    if (config_get('metis.settings', 'metis_force_ssl') == 1) {
       $server = 'https://ssl-vg03.met.vgwort.de';
     }
     else {
